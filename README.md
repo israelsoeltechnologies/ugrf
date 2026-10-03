@@ -1,6 +1,6 @@
 # UGRF — Utility-Gated Renewal Forecasting
 
-`ugrf-forecasting` is the reference Python package for **Utility-Gated Renewal Forecasting (UGRF)** for intermittent-demand panels.
+`ugrf` is the reference Python package for **Utility-Gated Renewal Forecasting (UGRF)** for intermittent-demand panels.
 
 This repository packages the frozen Paper-1 forecasting architecture as a small, explicit API:
 
@@ -21,7 +21,7 @@ pip install -e .
 Or install a built wheel:
 
 ```bash
-pip install dist/ugrf_forecasting-0.1.0-py3-none-any.whl
+pip install dist/ugrf-0.1.0-py3-none-any.whl
 ```
 
 Python 3.10–3.13 is supported.

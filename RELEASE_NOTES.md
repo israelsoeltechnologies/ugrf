@@ -1,4 +1,4 @@
-# UGRF v1 / `ugrf-forecasting` 0.1.0 release notes
+# UGRF v1 / `ugrf` 0.1.0 release notes
 
 This is the first packaged release of the frozen Utility-Gated Renewal Forecast architecture.
 

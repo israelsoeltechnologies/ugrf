@@ -33,7 +33,7 @@ CARPARTS_BLOB_API = "https://api.github.com/repos/brunoklein99/deepar/git/blobs/
 
 
 def download_url(url: str, path: Path) -> None:
-    req = urllib.request.Request(url, headers={"User-Agent": "ugrf-forecasting/0.1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "ugrf/0.1.0"})
     with urllib.request.urlopen(req) as response:
         path.write_bytes(response.read())
 
@@ -41,7 +41,7 @@ def download_url(url: str, path: Path) -> None:
 def download_carparts(path: Path) -> None:
     req = urllib.request.Request(
         CARPARTS_BLOB_API,
-        headers={"User-Agent": "ugrf-forecasting/0.1.0", "Accept": "application/vnd.github+json"},
+        headers={"User-Agent": "ugrf/0.1.0", "Accept": "application/vnd.github+json"},
     )
     with urllib.request.urlopen(req) as response:
         payload = json.loads(response.read().decode("utf-8"))
