@@ -50,3 +50,8 @@ where = ["src"]
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+
+[project.urls]
+Homepage = "https://github.com/israelsoeltechnologies/ugrf"
+Repository = "https://github.com/israelsoeltechnologies/ugrf"
+Issues = "https://github.com/israelsoeltechnologies/ugrf/issues"
