@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use UGRF, please cite the software and the associated preprint."
+title: "UGRF — Utility-Gated Renewal Forecasting"
+type: software
+version: 0.1.0
+authors:
+  - family-names: Igietsemhe
+    given-names: Israel Aloagbaye
+    affiliation: Soel Technologies
+    email: israel@soeltechnologies.com
+preferred-citation:
+  type: article
+  title: "Utility-Gated Renewal Forecasting for Intermittent Demand"
+  authors:
+    - family-names: Igietsemhe
+      given-names: Israel Aloagbaye
+      affiliation: Soel Technologies

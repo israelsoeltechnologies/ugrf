@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugrf-forecasting"
+version = "0.1.0"
+description = "Utility-Gated Renewal Forecasting for intermittent demand"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+authors = [
+  {name = "Israel Aloagbaye Igietsemhe", email = "israel@soeltechnologies.com"}
+]
+maintainers = [
+  {name = "Israel Aloagbaye Igietsemhe", email = "israel@soeltechnologies.com"}
+]
+keywords = [
+  "forecasting",
+  "intermittent-demand",
+  "inventory",
+  "renewal-process",
+  "TSB"
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Manufacturing",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Information Analysis"
+]
+dependencies = [
+  "numpy>=1.24"
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.4"]
+research = ["pandas>=2.0"]
+dev = ["pytest>=7.4", "pandas>=2.0", "build>=1.0"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
