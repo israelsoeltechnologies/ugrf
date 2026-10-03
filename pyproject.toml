@@ -55,3 +55,4 @@ testpaths = ["tests"]
 Homepage = "https://github.com/israelsoeltechnologies/ugrf"
 Repository = "https://github.com/israelsoeltechnologies/ugrf"
 Issues = "https://github.com/israelsoeltechnologies/ugrf/issues"
+Documentation = "https://github.com/israelsoeltechnologies/ugrf#readme"
