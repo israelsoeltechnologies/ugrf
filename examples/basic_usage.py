@@ -12,16 +12,23 @@ panel = np.array(
     dtype=float,
 )
 
-print("TSB:", TSB().fit(panel[0, :15]).predict_cumulative(3))
+print("TSB cumulative:", TSB().fit(panel[0, :15]).predict_cumulative(3))
 
 renewal = RenewalForecaster().fit(panel, origin=15)
-print("Renewal:", renewal.cumulative_for_training_panel(horizon=3))
+print("Renewal point paths:\n", renewal.predict(horizon=3))
+print("Renewal cumulative:", renewal.cumulative_for_training_panel(horizon=3))
 
 ugrf = UtilityGatedRenewal(horizon=3).fit(
     panel,
     utility_origins=[9, 12],
     final_origin=15,
 )
-print("UGRF:", ugrf.predict_cumulative())
+
+# Standard forecasting API: one point forecast per lead.
+print("UGRF point paths:\n", ugrf.predict())
+
+# Operational cumulative target used in the Paper-1 benchmark.
+print("UGRF cumulative:", ugrf.predict_cumulative())
+
 print("utility:", ugrf.utility_)
 print("selected:", ugrf.selected_model_)

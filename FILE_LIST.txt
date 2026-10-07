@@ -1,0 +1,15 @@
+.github/workflows/docs.yml
+GITHUB_PAGES_SETUP.md
+docs/api.md
+docs/citation.md
+docs/configuration.md
+docs/diagnostics.md
+docs/faq.md
+docs/forecasting.md
+docs/getting-started.md
+docs/index.md
+docs/model_spec.md
+docs/reproducibility.md
+docs/roadmap.md
+mkdocs.yml
+pyproject_docs_snippet.toml

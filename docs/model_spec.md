@@ -1,45 +1,97 @@
-# Frozen UGRF v1 model specification
+# Frozen UGRF v1 Model Specification
 
-UGRF combines a TSB baseline and a pooled-age Renewal candidate. For each SKU `i` and historical forecast origin `o`, both experts are fitted using only data available through that origin and scored on the same cumulative forecast horizon.
+UGRF combines a TSB baseline and a pooled-age Renewal candidate. For each SKU \(i\) and historical forecast origin \(o\), both experts are fitted using only information available at that origin and scored on the same cumulative forecast horizon.
 
-## TSB
+## TSB baseline
 
-The frozen reference uses `alpha = beta = 0.10`.
+The frozen reference uses:
 
-Occurrence probability is initialized with a half-count correction,
+\[
+\alpha=\beta=0.10.
+\]
 
-`p0 = (number_of_positive_periods + 0.5) / (n_periods + 1)`,
+Occurrence probability is initialized with a half-count correction:
 
-and positive size is initialized at the mean positive demand. The implementation then applies the frozen recursive update order over the full training history.
+\[
+p_0=\frac{n_{positive}+0.5}{n_{periods}+1}.
+\]
+
+Positive size is initialized at the mean positive demand. The package then applies the frozen recursive update order over the complete training history.
 
 ## Renewal occurrence model
 
-The pooled age shape is
+\[
+\operatorname{logit}[P(O_{i,t}=1)]
+=
+\alpha_i+\beta_1\log A_{i,t}+\beta_2(\log A_{i,t})^2.
+\]
 
-`logit P(O_it = 1) = alpha_i + beta1 log(A_it) + beta2 log(A_it)^2`.
+The pooled age-shape coefficients are estimated from completed inter-demand intervals across the panel using the discrete-time risk set. A ridge penalty of 1 is applied to each age coefficient.
 
-`beta1` and `beta2` are estimated from completed inter-demand intervals pooled across SKUs using the discrete-time risk set and a ridge penalty of 1 on each age coefficient. The pooled shape is then held fixed while a local intercept `alpha_i` is fitted to each SKU's occurrence history.
+The pooled shape is then held fixed while the SKU-specific occurrence intercept \(\alpha_i\) is fitted locally.
 
 ## Positive magnitude
 
-The panel anchor is the intercept from a pooled log-link count model with `log(age)` as a covariate and ridge penalty 1 on the age coefficient. The local mean is computed on log positive demand and shrunk toward the panel anchor with pseudo-count strength `k=5`.
+The panel anchor is the intercept from a pooled log-link count model with `log(age)` as a covariate and ridge penalty 1 on the age coefficient.
 
-## Multi-step forecast
+The SKU-level local log-positive mean is shrunk toward the panel anchor with pseudo-count strength:
 
-Future probability mass is propagated across age states. Event mass resets to age 1; no-event mass advances to age + 1. Expected lead demand equals marginal event probability times the fitted deterministic positive magnitude.
+\[
+k=5.
+\]
+
+## Multi-step Renewal forecast
+
+Future probability mass is propagated across demand-age states. Event mass resets to age 1; no-event mass advances to age \(a+1\).
+
+If \(q_{i,h}\) is the marginal event probability at lead \(h\) and \(\hat\mu_i\) is the fitted positive magnitude:
+
+\[
+\hat y_{i,t+h}^{R}=\hat\mu_i q_{i,h}.
+\]
+
+The cumulative Renewal forecast is:
+
+\[
+\hat D_i^{(H),R}=\sum_{h=1}^{H}\hat y_{i,t+h}^{R}.
+\]
+
+## Historical utility
+
+At historical origin \(o\):
+
+\[
+G_{i,o}=L_{i,o}(\mathrm{TSB})-L_{i,o}(R).
+\]
+
+Historical utility is:
+
+\[
+U_i=\sum_{o\in\mathcal O_i}G_{i,o}.
+\]
 
 ## Utility gate
 
-At each historical origin:
+\[
+w_i=\mathbb I(U_i>0).
+\]
 
-`G_i,o = L_i,o(TSB) - L_i,o(Renewal)`
+The final lead-by-lead point forecast is:
 
-with cumulative absolute error as the frozen loss. Historical utility is
+\[
+\hat{\mathbf y}^{UGRF}_i
+=
+w_i\hat{\mathbf y}^{R}_i+(1-w_i)\hat{\mathbf y}^{TSB}_i.
+\]
 
-`U_i = sum_o G_i,o`.
+The cumulative forecast is:
 
-The final decision is strictly:
+\[
+\hat D_i^{(H),UGRF}=\sum_{h=1}^{H}\hat y_{i,t+h}^{UGRF}.
+\]
 
-`Renewal if U_i > 0 else TSB`.
+If no valid historical utility evidence exists, utility is set to zero and TSB remains the fallback.
 
-No threshold tuning, recency weighting, confidence filter, or dataset identifier is part of UGRF v1.
+## Frozen v1 boundary
+
+The canonical model contains no dataset-specific threshold, threshold tuning, recency weighting, confidence filter, dataset identifier, or ML routing model.

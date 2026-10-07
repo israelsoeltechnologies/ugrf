@@ -3,6 +3,8 @@ message: "If you use UGRF, please cite the software and the associated preprint.
 title: "UGRF — Utility-Gated Renewal Forecasting"
 type: software
 version: 0.1.0
+license: Apache-2.0
+repository-code: "https://github.com/israelsoeltechnologies/ugrf"
 authors:
   - family-names: Igietsemhe
     given-names: Israel Aloagbaye

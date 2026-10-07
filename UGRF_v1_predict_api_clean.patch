@@ -1,0 +1,402 @@
+--- a/src/ugrf/gated.py
++++ b/src/ugrf/gated.py
+@@ -12,6 +12,15 @@
+ 
+     Renewal is selected for SKU i iff the sum of prior rolling-origin
+     cumulative absolute-error gains over TSB is strictly positive.
++
++    Notes
++    -----
++    ``predict()`` returns the lead-by-lead point forecast path with shape
++    ``(n_series, horizon)``. ``predict_cumulative()`` returns the cumulative
++    forecast over the same horizon with shape ``(n_series,)``.
++
++    The fitted horizon is part of the UGRF gate definition. To forecast a
++    different horizon, refit the model with that horizon.
+     """
+ 
+     def __init__(self, horizon: int = 6, tsb_alpha: float = 0.10, tsb_beta: float = 0.10):
+@@ -37,6 +46,8 @@
+         )
+ 
+         renewal_model = RenewalForecaster().fit(arr, origin=final)
++
++        # Preserve the frozen cumulative calculations exactly.
+         renewal = renewal_model.cumulative_for_training_panel(horizon=self.horizon)
+         tsb = tsb_panel_forecast(
+             arr,
+@@ -50,13 +61,32 @@
+         selected = (utility > 0.0) & renewal_valid
+         forecast = np.where(selected, renewal, tsb)
+ 
++        # Expose the full lead-by-lead forecast path. The Renewal expert already
++        # has a non-flat multi-step path. Frozen TSB is constant across future
++        # leads, so its path is its cumulative forecast divided by the horizon.
++        renewal_path = renewal_model.predict(horizon=self.horizon)
++        tsb_path = np.repeat(
++            (tsb / float(self.horizon))[:, None],
++            self.horizon,
++            axis=1,
++        )
++        forecast_path = np.where(selected[:, None], renewal_path, tsb_path)
++
+         # All-zero histories have no valid frozen Renewal forecast. Their TSB
+         # forecast is operationally zero, so expose zero rather than NaN.
+         all_zero = ~np.any(arr[:, :final] > 0, axis=1)
++
+         tsb = tsb.copy()
+         tsb[all_zero] = 0.0
++
++        tsb_path = tsb_path.copy()
++        tsb_path[all_zero, :] = 0.0
++
+         forecast = forecast.copy()
+         forecast[all_zero] = 0.0
++
++        forecast_path = forecast_path.copy()
++        forecast_path[all_zero, :] = 0.0
+ 
+         self.panel_ = arr
+         self.final_origin_ = final
+@@ -64,24 +94,61 @@
+         self.utility_ = utility
+         self.utility_evidence_count_ = seen
+         self.renewal_model_ = renewal_model
++
++        # Cumulative expert and final forecasts retained for backward
++        # compatibility and frozen Paper-1 reproduction.
+         self.renewal_forecast_ = renewal
+         self.tsb_forecast_ = tsb
++        self.forecast_ = forecast
++
++        # Lead-by-lead point-forecast paths.
++        self.renewal_path_ = renewal_path
++        self.tsb_path_ = tsb_path
++        self.forecast_path_ = forecast_path
++
+         self.renewal_active_ = selected
+         self.selected_model_ = np.where(selected, "Renewal", "TSB")
+-        self.forecast_ = forecast
+         return self
+ 
+     def _check_fitted(self) -> None:
+         if not hasattr(self, "forecast_"):
+             raise RuntimeError("UtilityGatedRenewal is not fitted. Call fit() first.")
+ 
+-    def predict_cumulative(self, horizon: int | None = None) -> np.ndarray:
+-        self._check_fitted()
++    def _check_prediction_horizon(self, horizon: int | None) -> None:
+         if horizon is not None and validate_horizon(horizon) != self.horizon:
+             raise ValueError(
+                 "The UGRF gate was evaluated for a different horizon. "
+                 "Refit UtilityGatedRenewal with the desired horizon."
+             )
++
++    def predict(self, horizon: int | None = None) -> np.ndarray:
++        """Return lead-by-lead UGRF point forecasts.
++
++        Parameters
++        ----------
++        horizon : int, optional
++            Forecast horizon. If supplied, it must equal the horizon used when
++            the model was fitted because the UGRF gate is horizon-specific.
++
++        Returns
++        -------
++        numpy.ndarray
++            Array with shape ``(n_series, horizon)``. Each row is the complete
++            point-forecast path from the expert selected by the UGRF gate.
++
++        Examples
++        --------
++        ``model.predict(6)[0]`` may return a six-lead path such as
++        ``[3., 4., 5., 6., 7., 8.]`` for one SKU.
++        """
++        self._check_fitted()
++        self._check_prediction_horizon(horizon)
++        return self.forecast_path_.copy()
++
++    def predict_cumulative(self, horizon: int | None = None) -> np.ndarray:
++        """Return the cumulative UGRF forecast over the fitted horizon."""
++        self._check_fitted()
++        self._check_prediction_horizon(horizon)
+         return self.forecast_.copy()
+ 
+     def score_final_window(self) -> dict[str, np.ndarray]:
+--- a/tests/test_gated.py
++++ b/tests/test_gated.py
+@@ -18,6 +18,7 @@
+     assert np.all(model.utility_ == 0)
+     assert np.all(model.selected_model_ == "TSB")
+     assert model.predict_cumulative()[-1] == 0.0
++    assert np.all(model.predict()[-1] == 0.0)
+ 
+ 
+ def test_selection_matches_strict_positive_utility():
+@@ -29,6 +30,32 @@
+         np.where(expected, model.renewal_forecast_, model.tsb_forecast_),
+         equal_nan=True,
+     )
++    assert np.allclose(
++        model.predict(),
++        np.where(expected[:, None], model.renewal_path_, model.tsb_path_),
++        equal_nan=True,
++    )
++
++
++def test_predict_returns_full_point_forecast_path():
++    model = UtilityGatedRenewal(horizon=3).fit(panel(), utility_origins=[9, 12], final_origin=15)
++    forecast = model.predict()
++
++    assert forecast.shape == (panel().shape[0], 3)
++    assert np.all(forecast >= 0.0)
++
++    # The public point-forecast path and cumulative forecast are coherent.
++    assert np.allclose(
++        forecast.sum(axis=1),
++        model.predict_cumulative(),
++        rtol=1e-12,
++        atol=1e-12,
++    )
++
++
++def test_predict_accepts_the_fitted_horizon_positionally():
++    model = UtilityGatedRenewal(horizon=3).fit(panel(), utility_origins=[9, 12], final_origin=15)
++    assert np.allclose(model.predict(3), model.predict(), rtol=0, atol=0)
+ 
+ 
+ def test_prevents_utility_leakage():
+@@ -39,4 +66,6 @@
+ def test_horizon_is_part_of_gate_definition():
+     model = UtilityGatedRenewal(horizon=3).fit(panel(), utility_origins=[9, 12], final_origin=15)
+     with pytest.raises(ValueError, match="different horizon"):
++        model.predict(horizon=4)
++    with pytest.raises(ValueError, match="different horizon"):
+         model.predict_cumulative(horizon=4)
+--- a/examples/basic_usage.py
++++ b/examples/basic_usage.py
+@@ -12,16 +12,23 @@
+     dtype=float,
+ )
+ 
+-print("TSB:", TSB().fit(panel[0, :15]).predict_cumulative(3))
++print("TSB cumulative:", TSB().fit(panel[0, :15]).predict_cumulative(3))
+ 
+ renewal = RenewalForecaster().fit(panel, origin=15)
+-print("Renewal:", renewal.cumulative_for_training_panel(horizon=3))
++print("Renewal point paths:\n", renewal.predict(horizon=3))
++print("Renewal cumulative:", renewal.cumulative_for_training_panel(horizon=3))
+ 
+ ugrf = UtilityGatedRenewal(horizon=3).fit(
+     panel,
+     utility_origins=[9, 12],
+     final_origin=15,
+ )
+-print("UGRF:", ugrf.predict_cumulative())
++
++# Standard forecasting API: one point forecast per lead.
++print("UGRF point paths:\n", ugrf.predict())
++
++# Operational cumulative target used in the Paper-1 benchmark.
++print("UGRF cumulative:", ugrf.predict_cumulative())
++
+ print("utility:", ugrf.utility_)
+ print("selected:", ugrf.selected_model_)
+--- a/docs/model_spec.md
++++ b/docs/model_spec.md
+@@ -28,6 +28,15 @@
+ 
+ Future probability mass is propagated across age states. Event mass resets to age 1; no-event mass advances to age + 1. Expected lead demand equals marginal event probability times the fitted deterministic positive magnitude.
+ 
++The public UGRF API exposes both representations of this forecast:
++
++- `model.predict()` returns the lead-by-lead point forecast path with shape `(n_series, horizon)`.
++- `model.predict_cumulative()` returns the cumulative total over the same fitted horizon with shape `(n_series,)`.
++
++For a six-period model, a single row from `predict()` might look like `[3, 4, 5, 6, 7, 8]`, while the matching cumulative forecast is `33`.
++
++The gate is horizon-specific. A model fitted with `horizon=6` cannot be used as `model.predict(12)`; it must be refitted with `horizon=12` so that historical utility is evaluated on the same operational target.
++
+ ## Utility gate
+ 
+ At each historical origin:
+@@ -42,4 +51,6 @@
+ 
+ `Renewal if U_i > 0 else TSB`.
+ 
++The same selected expert supplies the entire lead-by-lead path returned by `predict()`.
++
+ No threshold tuning, recency weighting, confidence filter, or dataset identifier is part of UGRF v1.
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,6 @@
+ # UGRF — Utility-Gated Renewal Forecasting
+ 
+-`ugrf-forecasting` is the reference Python package for **Utility-Gated Renewal Forecasting (UGRF)** for intermittent-demand panels.
++`ugrf` is the reference Python package for **Utility-Gated Renewal Forecasting (UGRF)** for intermittent-demand panels.
+ 
+ This repository packages the frozen Paper-1 forecasting architecture as a small, explicit API:
+ 
+@@ -12,16 +12,16 @@
+ 
+ ## Installation
+ 
+-From the repository root:
++Install from PyPI:
++
++```bash
++pip install ugrf
++```
++
++For local development from the repository root:
+ 
+ ```bash
+ pip install -e .
+-```
+-
+-Or install a built wheel:
+-
+-```bash
+-pip install dist/ugrf_forecasting-0.1.0-py3-none-any.whl
+ ```
+ 
+ Python 3.10–3.13 is supported.
+@@ -47,11 +47,25 @@
+     final_origin=15,           # fit final experts using periods [0, 15)
+ )
+ 
+-forecast = model.predict_cumulative()
++# Lead-by-lead point forecasts, shape (n_skus, 3)
++forecast = model.predict()
++
++# Cumulative 3-period forecasts, shape (n_skus,)
++cumulative = model.predict_cumulative()
++
+ print(forecast)
++print(cumulative)
+ print(model.utility_)
+ print(model.selected_model_)
+ ```
++
++`predict()` follows the familiar forecasting convention: it returns one point forecast for each future lead. For example, a six-period forecast for one SKU can look like:
++
++```text
++[3., 4., 5., 6., 7., 8.]
++```
++
++The corresponding `predict_cumulative()` value is the sum of those lead forecasts.
+ 
+ The gate is fixed at zero:
+ 
+@@ -62,6 +76,23 @@
+ 
+ No dataset-specific utility threshold is estimated by the package.
+ 
++### Forecast horizon
++
++The forecast horizon is part of the gate definition. If a model is fitted with:
++
++```python
++model = UtilityGatedRenewal(horizon=6)
++```
++
++then both:
++
++```python
++model.predict()
++model.predict(6)
++```
++
++return the fitted six-lead path. Calling `model.predict(12)` raises an error; refit the model with `horizon=12` so that the gate is evaluated on the same target.
++
+ ## Standalone experts
+ 
+ ```python
+@@ -69,10 +100,12 @@
+ 
+ # One series
+ baseline = TSB().fit(panel[0, :15])
++print(baseline.predict(horizon=3))
+ print(baseline.predict_cumulative(horizon=3))
+ 
+ # Pooled renewal expert
+ renewal = RenewalForecaster().fit(panel, origin=15)
++print(renewal.predict(horizon=3))
+ print(renewal.predict_cumulative(horizon=3))
+ ```
+ 
+@@ -128,8 +161,8 @@
+ 
+ ## Citation
+ 
+-See `CITATION.cff`. The associated preprint is **Utility-Gated Renewal Forecasting for Intermittent Demand** by Israel Aloagbaye Igietsemhe, Soel Technologies. A public repository URL / archival identifier can be added once the repository is published.
++See `CITATION.cff`. The associated preprint is **Utility-Gated Renewal Forecasting for Intermittent Demand** by Israel Aloagbaye Igietsemhe, Soel Technologies.
+ 
+-## License status
++## License
+ 
+-A software license has **not yet been selected** for this release candidate. Choose and add the intended license (for example MIT or Apache-2.0) before public distribution.
++UGRF is released under the **Apache License 2.0**. See `LICENSE`.
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,4 +1,14 @@
+ # Changelog
++
++## Unreleased
++
++- Added `UtilityGatedRenewal.predict()` for lead-by-lead point forecasts.
++- Added `renewal_path_`, `tsb_path_`, and `forecast_path_` fitted attributes.
++- Kept `predict_cumulative()` as the cumulative operational forecast used by the frozen Paper-1 benchmark.
++- Enforced the fitted horizon for both `predict()` and `predict_cumulative()` so the forecast target remains aligned with the UGRF utility gate.
++- Added regression tests verifying that point forecasts sum to the unchanged cumulative forecast.
++- Updated public examples and model documentation to distinguish point and cumulative forecasts.
++- Updated package documentation to reflect the Apache-2.0 license and PyPI installation.
+ 
+ ## 0.1.0 — UGRF v1
+ 
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -3,11 +3,12 @@
+ build-backend = "setuptools.build_meta"
+ 
+ [project]
+-name = "ugrf-forecasting"
++name = "ugrf"
+ version = "0.1.0"
+ description = "Utility-Gated Renewal Forecasting for intermittent demand"
+ readme = "README.md"
+-requires-python = ">=3.10,<3.14"
++requires-python = ">=3.10,<3.15"
++license = {file = "LICENSE"}
+ authors = [
+   {name = "Israel Aloagbaye Igietsemhe", email = "israel@soeltechnologies.com"}
+ ]
+@@ -25,6 +26,7 @@
+   "Development Status :: 3 - Alpha",
+   "Intended Audience :: Science/Research",
+   "Intended Audience :: Manufacturing",
++  "License :: OSI Approved :: Apache Software License",
+   "Programming Language :: Python :: 3",
+   "Programming Language :: Python :: 3.10",
+   "Programming Language :: Python :: 3.11",
+@@ -50,3 +52,9 @@
+ [tool.pytest.ini_options]
+ addopts = "-q"
+ testpaths = ["tests"]
++
++[project.urls]
++Homepage = "https://github.com/israelsoeltechnologies/ugrf"
++Repository = "https://github.com/israelsoeltechnologies/ugrf"
++Issues = "https://github.com/israelsoeltechnologies/ugrf/issues"
++Documentation = "https://github.com/israelsoeltechnologies/ugrf#readme"
+--- a/CITATION.cff
++++ b/CITATION.cff
+@@ -3,6 +3,8 @@
+ title: "UGRF — Utility-Gated Renewal Forecasting"
+ type: software
+ version: 0.1.0
++license: Apache-2.0
++repository-code: "https://github.com/israelsoeltechnologies/ugrf"
+ authors:
+   - family-names: Igietsemhe
+     given-names: Israel Aloagbaye

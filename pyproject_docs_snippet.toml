@@ -1,0 +1,12 @@
+# Optional pyproject.toml additions.
+# The GitHub Actions workflow installs these dependencies directly, so this
+# snippet is optional but useful for local development.
+
+# Merge this key into the existing [project.optional-dependencies] table:
+docs = [
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.26",
+]
+
+# Replace the existing Documentation entry in [project.urls]:
+Documentation = "https://israelsoeltechnologies.github.io/ugrf/"

@@ -1,0 +1,80 @@
+site_name: UGRF
+site_description: Utility-Gated Renewal Forecasting for intermittent demand
+site_author: Israel Aloagbaye Igietsemhe
+site_url: https://israelsoeltechnologies.github.io/ugrf/
+
+repo_name: israelsoeltechnologies/ugrf
+repo_url: https://github.com/israelsoeltechnologies/ugrf
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2026 Israel Aloagbaye Igietsemhe / Soel Technologies
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - src
+          options:
+            docstring_style: numpy
+            show_root_heading: true
+            show_root_full_path: false
+            show_source: false
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - User Guide:
+      - Configuration: configuration.md
+      - Forecasting: forecasting.md
+      - Diagnostics: diagnostics.md
+      - Model Specification: model_spec.md
+  - API Reference: api.md
+  - Research:
+      - Reproducibility: reproducibility.md
+      - Citation: citation.md
+      - Roadmap: roadmap.md
+  - FAQ: faq.md
